@@ -1,0 +1,48 @@
+name: Bootstrap ProfilePilot source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bootstrap/**"
+      - ".github/workflows/bootstrap.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find bootstrap -maxdepth 1 -type f -name 'part*' | wc -l)" -eq 8
+          cat bootstrap/part* | base64 --decode > /tmp/profilepilot-source.tgz
+          echo "c7d0c65442adc6b51abdd2186855ffd8978a51e30fce437c4eb374514a8d4488  /tmp/profilepilot-source.tgz" | sha256sum --check --strict
+
+      - name: Expand standalone ProfilePilot application
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/profilepilot-source
+          tar -xzf /tmp/profilepilot-source.tgz -C /tmp/profilepilot-source
+          cp -a /tmp/profilepilot-source/. ./
+          rm -rf bootstrap
+          rm -f .github/workflows/bootstrap.yml
+
+      - name: Commit complete application
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add complete standalone ProfilePilot application"
+          git push origin main
