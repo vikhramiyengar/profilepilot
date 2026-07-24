@@ -53,19 +53,8 @@ if (!fs.existsSync(webPackage)) {
   });
 }
 
-// Apply the previously verified application feature layer.
-reconstructArchive({
-  directory: path.join(root, 'patches'),
-  segments: Array.from({ length: 9 }, (_, index) =>
-    `feature_20260725_${String(index).padStart(2, '0')}`
-  ),
-  expectedChecksum: '87efd9d0282dd41b7d459360846c63936521eedde5dfb02198950d584fb3eaa9',
-  outputPath: path.join('/tmp', 'profilepilot-feature-patch.tgz'),
-  label: 'ProfilePilot feature patch',
-});
-
-// Apply one consolidated, verified release hotfix. This deliberately replaces
-// the earlier multi-part corrected overlay that was failing in Vercel.
+// Apply the consolidated verified hotfix directly over the complete base source.
+// This removes the obsolete dependency on an incomplete legacy feature patch set.
 reconstructArchive({
   directory: path.join(root, 'patches'),
   segments: [
