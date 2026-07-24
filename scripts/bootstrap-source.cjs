@@ -7,116 +7,81 @@ const root = process.cwd();
 const webRoot = path.join(root, 'apps', 'web');
 const webPackage = path.join(webRoot, 'package.json');
 
-if (!fs.existsSync(webPackage)) {
-  const bootstrapDirectory = path.join(root, 'bootstrap');
-  const sourceSegments = [
-    'part00',
-    'part01',
-    'part02',
-    'part03',
-    'part04',
-    'fix05_00',
-    'fix05_01',
-    'fix05_02',
-    'fix05_03',
-    'fix05_04',
-    'fix05_05',
-    'part06',
-    'part07',
-  ];
-
-  for (const name of sourceSegments) {
-    const segmentPath = path.join(bootstrapDirectory, name);
+function reconstructArchive({ directory, segments, expectedChecksum, outputPath, label }) {
+  for (const name of segments) {
+    const segmentPath = path.join(directory, name);
     if (!fs.existsSync(segmentPath)) {
-      throw new Error(`Missing ProfilePilot source segment: ${name}`);
+      throw new Error(`Missing ${label} segment: ${name}`);
     }
   }
 
-  const encoded = sourceSegments
-    .map((name) => fs.readFileSync(path.join(bootstrapDirectory, name), 'utf8').trim())
+  const encoded = segments
+    .map((name) => fs.readFileSync(path.join(directory, name), 'utf8').trim())
     .join('');
   const archive = Buffer.from(encoded, 'base64');
   const checksum = crypto.createHash('sha256').update(archive).digest('hex');
-  const expected = 'c7d0c65442adc6b51abdd2186855ffd8978a51e30fce437c4eb374514a8d4488';
 
-  if (checksum !== expected) {
-    throw new Error(`ProfilePilot source checksum mismatch: expected ${expected}, received ${checksum}`);
+  if (checksum !== expectedChecksum) {
+    throw new Error(`${label} checksum mismatch: expected ${expectedChecksum}, received ${checksum}`);
   }
 
-  const archivePath = path.join('/tmp', 'profilepilot-source.tgz');
-  fs.writeFileSync(archivePath, archive);
-  execFileSync('tar', ['-xzf', archivePath, '-C', root], { stdio: 'inherit' });
+  fs.writeFileSync(outputPath, archive);
+  execFileSync('tar', ['-xzf', outputPath, '-C', root], { stdio: 'inherit' });
 }
 
-// Apply the earlier verified feature overlay after the base source is available.
-const patchDirectory = path.join(root, 'patches');
-const patchSegments = Array.from({ length: 9 }, (_, index) =>
-  `feature_20260725_${String(index).padStart(2, '0')}`
-);
-
-for (const name of patchSegments) {
-  const segmentPath = path.join(patchDirectory, name);
-  if (!fs.existsSync(segmentPath)) {
-    throw new Error(`Missing ProfilePilot feature patch segment: ${name}`);
-  }
+if (!fs.existsSync(webPackage)) {
+  reconstructArchive({
+    directory: path.join(root, 'bootstrap'),
+    segments: [
+      'part00',
+      'part01',
+      'part02',
+      'part03',
+      'part04',
+      'fix05_00',
+      'fix05_01',
+      'fix05_02',
+      'fix05_03',
+      'fix05_04',
+      'fix05_05',
+      'part06',
+      'part07',
+    ],
+    expectedChecksum: 'c7d0c65442adc6b51abdd2186855ffd8978a51e30fce437c4eb374514a8d4488',
+    outputPath: path.join('/tmp', 'profilepilot-source.tgz'),
+    label: 'ProfilePilot source',
+  });
 }
 
-const patchEncoded = patchSegments
-  .map((name) => fs.readFileSync(path.join(patchDirectory, name), 'utf8').trim())
-  .join('');
-const patchArchive = Buffer.from(patchEncoded, 'base64');
-const patchChecksum = crypto.createHash('sha256').update(patchArchive).digest('hex');
-const expectedPatchChecksum = '87efd9d0282dd41b7d459360846c63936521eedde5dfb02198950d584fb3eaa9';
+// Apply the previously verified application feature layer.
+reconstructArchive({
+  directory: path.join(root, 'patches'),
+  segments: Array.from({ length: 9 }, (_, index) =>
+    `feature_20260725_${String(index).padStart(2, '0')}`
+  ),
+  expectedChecksum: '87efd9d0282dd41b7d459360846c63936521eedde5dfb02198950d584fb3eaa9',
+  outputPath: path.join('/tmp', 'profilepilot-feature-patch.tgz'),
+  label: 'ProfilePilot feature patch',
+});
 
-if (patchChecksum !== expectedPatchChecksum) {
-  throw new Error(
-    `ProfilePilot feature patch checksum mismatch: expected ${expectedPatchChecksum}, received ${patchChecksum}`
-  );
-}
+// Apply one consolidated, verified release hotfix. This deliberately replaces
+// the earlier multi-part corrected overlay that was failing in Vercel.
+reconstructArchive({
+  directory: path.join(root, 'patches'),
+  segments: [
+    'hotfix_20260725_00',
+    'hotfix_20260725_01',
+    'hotfix_20260725_02',
+    'hotfix_20260725_03',
+  ],
+  expectedChecksum: '7baca63b51f765a8a9e7d0a29da6c9863052c2f0c4796a2875ee8753f0e162f0',
+  outputPath: path.join('/tmp', 'profilepilot-hotfix-20260725.tgz'),
+  label: 'ProfilePilot release hotfix',
+});
 
-const patchArchivePath = path.join('/tmp', 'profilepilot-feature-patch.tgz');
-fs.writeFileSync(patchArchivePath, patchArchive);
-execFileSync('tar', ['-xzf', patchArchivePath, '-C', root], { stdio: 'inherit' });
-
-// Apply the corrected AI, regional-pricing, payments, appeal and consultation overlay.
-const correctedPatchSegments = [
-  'feature_v2_00',
-  'feature_v2_01',
-  'feature_v2_02_03',
-  'feature_v2_04_05',
-  'feature_v2_06',
-];
-
-for (const name of correctedPatchSegments) {
-  const segmentPath = path.join(patchDirectory, name);
-  if (!fs.existsSync(segmentPath)) {
-    throw new Error(`Missing ProfilePilot corrected feature patch segment: ${name}`);
-  }
-}
-
-const correctedPatchEncoded = correctedPatchSegments
-  .map((name) => fs.readFileSync(path.join(patchDirectory, name), 'utf8').trim())
-  .join('');
-const correctedPatchArchive = Buffer.from(correctedPatchEncoded, 'base64');
-const correctedPatchChecksum = crypto
-  .createHash('sha256')
-  .update(correctedPatchArchive)
-  .digest('hex');
-const expectedCorrectedPatchChecksum = '4e8bd0e6dabd982a0a9d3de80daf271c74c98ee62e1851d03b9deb90f092c560';
-
-if (correctedPatchChecksum !== expectedCorrectedPatchChecksum) {
-  throw new Error(
-    `ProfilePilot corrected feature patch checksum mismatch: expected ${expectedCorrectedPatchChecksum}, received ${correctedPatchChecksum}`
-  );
-}
-
-const correctedPatchArchivePath = path.join('/tmp', 'profilepilot-feature-v2.tgz');
-fs.writeFileSync(correctedPatchArchivePath, correctedPatchArchive);
-execFileSync('tar', ['-xzf', correctedPatchArchivePath, '-C', root], { stdio: 'inherit' });
-console.log('ProfilePilot: applied corrected AI, regional pricing, payments, appeal and consultation overlay.');
+console.log('ProfilePilot: applied verified AI, voice, image studio, appeal and consultation release.');
 
 // Keep the public site usable before production Supabase credentials are added.
-// Explicit Vercel environment variables always take precedence over this file.
 const hasSupabaseBrowserCredentials = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
