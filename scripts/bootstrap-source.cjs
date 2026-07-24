@@ -78,23 +78,42 @@ const patchArchivePath = path.join('/tmp', 'profilepilot-feature-patch.tgz');
 fs.writeFileSync(patchArchivePath, patchArchive);
 execFileSync('tar', ['-xzf', patchArchivePath, '-C', root], { stdio: 'inherit' });
 
-// Apply the latest AI quality, prompt-voice, image-quality, regional-pricing and support upgrade.
-const upgradePath = path.join(root, 'bootstrap', 'upgrade-v2.b64');
-if (!fs.existsSync(upgradePath)) {
-  throw new Error('Missing ProfilePilot upgrade package: bootstrap/upgrade-v2.b64');
+// Apply the corrected AI, regional-pricing, payments, appeal and consultation overlay.
+const correctedPatchSegments = [
+  'feature_v2_00',
+  'feature_v2_01',
+  'feature_v2_02_03',
+  'feature_v2_04_05',
+  'feature_v2_06',
+];
+
+for (const name of correctedPatchSegments) {
+  const segmentPath = path.join(patchDirectory, name);
+  if (!fs.existsSync(segmentPath)) {
+    throw new Error(`Missing ProfilePilot corrected feature patch segment: ${name}`);
+  }
 }
-const upgradeArchive = Buffer.from(fs.readFileSync(upgradePath, 'utf8').trim(), 'base64');
-const upgradeChecksum = crypto.createHash('sha256').update(upgradeArchive).digest('hex');
-const expectedUpgradeChecksum = '33d8a8e4a92f0470b8d835a999a5f1b7fe2ec5f2a0e14e974c2cc4ed6e048c5e';
-if (upgradeChecksum !== expectedUpgradeChecksum) {
+
+const correctedPatchEncoded = correctedPatchSegments
+  .map((name) => fs.readFileSync(path.join(patchDirectory, name), 'utf8').trim())
+  .join('');
+const correctedPatchArchive = Buffer.from(correctedPatchEncoded, 'base64');
+const correctedPatchChecksum = crypto
+  .createHash('sha256')
+  .update(correctedPatchArchive)
+  .digest('hex');
+const expectedCorrectedPatchChecksum = '4e8bd0e6dabd982a0a9d3de80daf271c74c98ee62e1851d03b9deb90f092c560';
+
+if (correctedPatchChecksum !== expectedCorrectedPatchChecksum) {
   throw new Error(
-    `ProfilePilot upgrade checksum mismatch: expected ${expectedUpgradeChecksum}, received ${upgradeChecksum}`
+    `ProfilePilot corrected feature patch checksum mismatch: expected ${expectedCorrectedPatchChecksum}, received ${correctedPatchChecksum}`
   );
 }
-const upgradeArchivePath = path.join('/tmp', 'profilepilot-upgrade-v2.tgz');
-fs.writeFileSync(upgradeArchivePath, upgradeArchive);
-execFileSync('tar', ['-xzf', upgradeArchivePath, '-C', root], { stdio: 'inherit' });
-console.log('ProfilePilot: applied latest AI, regional pricing, profile appeal and consultation upgrade.');
+
+const correctedPatchArchivePath = path.join('/tmp', 'profilepilot-feature-v2.tgz');
+fs.writeFileSync(correctedPatchArchivePath, correctedPatchArchive);
+execFileSync('tar', ['-xzf', correctedPatchArchivePath, '-C', root], { stdio: 'inherit' });
+console.log('ProfilePilot: applied corrected AI, regional pricing, payments, appeal and consultation overlay.');
 
 // Keep the public site usable before production Supabase credentials are added.
 // Explicit Vercel environment variables always take precedence over this file.
