@@ -1,0 +1,54 @@
+name: ProfilePilot Build Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "diagnostics/trigger.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run exact production build and capture output
+        shell: bash
+        run: |
+          set +e
+          mkdir -p diagnostics
+          npm install > diagnostics/latest-build.log 2>&1
+          install_code=$?
+          if [ "$install_code" -eq 0 ]; then
+            npm run build >> diagnostics/latest-build.log 2>&1
+            build_code=$?
+          else
+            build_code=$install_code
+          fi
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "install_code=${install_code}"
+            echo "build_code=${build_code}"
+          } > diagnostics/latest-build-status.txt
+          exit 0
+
+      - name: Publish diagnostic log to isolated branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B diagnostics/build-log
+          git add diagnostics/latest-build.log diagnostics/latest-build-status.txt
+          git commit -m "Record ProfilePilot build diagnostic"
+          git push --force origin diagnostics/build-log
