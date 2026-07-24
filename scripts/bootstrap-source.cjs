@@ -48,6 +48,37 @@ if (!fs.existsSync(webPackage)) {
   execFileSync('tar', ['-xzf', archivePath, '-C', root], { stdio: 'inherit' });
 }
 
+// Apply the verified feature overlay after the base source is available.
+const patchDirectory = path.join(root, 'patches');
+const patchSegments = Array.from({ length: 9 }, (_, index) =>
+  `feature_20260725_${String(index).padStart(2, '0')}`
+);
+
+for (const name of patchSegments) {
+  const segmentPath = path.join(patchDirectory, name);
+  if (!fs.existsSync(segmentPath)) {
+    throw new Error(`Missing ProfilePilot feature patch segment: ${name}`);
+  }
+}
+
+const patchEncoded = patchSegments
+  .map((name) => fs.readFileSync(path.join(patchDirectory, name), 'utf8').trim())
+  .join('');
+const patchArchive = Buffer.from(patchEncoded, 'base64');
+const patchChecksum = crypto.createHash('sha256').update(patchArchive).digest('hex');
+const expectedPatchChecksum = '87efd9d0282dd41b7d459360846c63936521eedde5dfb02198950d584fb3eaa9';
+
+if (patchChecksum !== expectedPatchChecksum) {
+  throw new Error(
+    `ProfilePilot feature patch checksum mismatch: expected ${expectedPatchChecksum}, received ${patchChecksum}`
+  );
+}
+
+const patchArchivePath = path.join('/tmp', 'profilepilot-feature-patch.tgz');
+fs.writeFileSync(patchArchivePath, patchArchive);
+execFileSync('tar', ['-xzf', patchArchivePath, '-C', root], { stdio: 'inherit' });
+console.log('ProfilePilot: applied verified AI, regional pricing, appeal and consultation feature patch.');
+
 // Keep the public site usable before production Supabase credentials are added.
 // Explicit Vercel environment variables always take precedence over this file.
 const hasSupabaseBrowserCredentials = Boolean(
