@@ -4,7 +4,8 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const root = process.cwd();
-const webPackage = path.join(root, 'apps', 'web', 'package.json');
+const webRoot = path.join(root, 'apps', 'web');
+const webPackage = path.join(webRoot, 'package.json');
 
 if (!fs.existsSync(webPackage)) {
   const bootstrapDirectory = path.join(root, 'bootstrap');
@@ -45,6 +46,22 @@ if (!fs.existsSync(webPackage)) {
   const archivePath = path.join('/tmp', 'profilepilot-source.tgz');
   fs.writeFileSync(archivePath, archive);
   execFileSync('tar', ['-xzf', archivePath, '-C', root], { stdio: 'inherit' });
+}
+
+// Keep the public site usable before production Supabase credentials are added.
+// Explicit Vercel environment variables always take precedence over this file.
+const hasSupabaseBrowserCredentials = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+const hasExplicitDemoSetting = typeof process.env.NEXT_PUBLIC_DEMO_MODE === 'string';
+
+if (!hasSupabaseBrowserCredentials && !hasExplicitDemoSetting) {
+  fs.writeFileSync(
+    path.join(webRoot, '.env.local'),
+    'NEXT_PUBLIC_DEMO_MODE=true\n',
+    'utf8'
+  );
+  console.log('ProfilePilot: enabled safe demo mode because Supabase browser credentials are not configured.');
 }
 
 execFileSync(
