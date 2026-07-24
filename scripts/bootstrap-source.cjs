@@ -8,23 +8,38 @@ const webPackage = path.join(root, 'apps', 'web', 'package.json');
 
 if (!fs.existsSync(webPackage)) {
   const bootstrapDirectory = path.join(root, 'bootstrap');
-  const parts = fs.readdirSync(bootstrapDirectory)
-    .filter((name) => /^part\d+$/.test(name))
-    .sort();
+  const sourceSegments = [
+    'part00',
+    'part01',
+    'part02',
+    'part03',
+    'part04',
+    'fix05_00',
+    'fix05_01',
+    'fix05_02',
+    'fix05_03',
+    'fix05_04',
+    'fix05_05',
+    'part06',
+    'part07',
+  ];
 
-  if (parts.length !== 8) {
-    throw new Error(`Expected 8 ProfilePilot archive segments, found ${parts.length}.`);
+  for (const name of sourceSegments) {
+    const segmentPath = path.join(bootstrapDirectory, name);
+    if (!fs.existsSync(segmentPath)) {
+      throw new Error(`Missing ProfilePilot source segment: ${name}`);
+    }
   }
 
-  const encoded = parts
-    .map((name) => fs.readFileSync(path.join(bootstrapDirectory, name), 'utf8'))
+  const encoded = sourceSegments
+    .map((name) => fs.readFileSync(path.join(bootstrapDirectory, name), 'utf8').trim())
     .join('');
   const archive = Buffer.from(encoded, 'base64');
   const checksum = crypto.createHash('sha256').update(archive).digest('hex');
   const expected = 'c7d0c65442adc6b51abdd2186855ffd8978a51e30fce437c4eb374514a8d4488';
 
   if (checksum !== expected) {
-    throw new Error(`ProfilePilot source checksum mismatch: ${checksum}`);
+    throw new Error(`ProfilePilot source checksum mismatch: expected ${expected}, received ${checksum}`);
   }
 
   const archivePath = path.join('/tmp', 'profilepilot-source.tgz');
