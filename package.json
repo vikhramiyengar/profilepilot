@@ -1,0 +1,13 @@
+{
+  "name": "profilepilot-deployment-bootstrap",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "postinstall": "node scripts/bootstrap-source.cjs",
+    "build": "npm --prefix apps/web run build",
+    "start": "npm --prefix apps/web run start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
