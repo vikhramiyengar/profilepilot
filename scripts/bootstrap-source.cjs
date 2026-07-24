@@ -48,7 +48,7 @@ if (!fs.existsSync(webPackage)) {
   execFileSync('tar', ['-xzf', archivePath, '-C', root], { stdio: 'inherit' });
 }
 
-// Apply the verified feature overlay after the base source is available.
+// Apply the earlier verified feature overlay after the base source is available.
 const patchDirectory = path.join(root, 'patches');
 const patchSegments = Array.from({ length: 9 }, (_, index) =>
   `feature_20260725_${String(index).padStart(2, '0')}`
@@ -77,7 +77,24 @@ if (patchChecksum !== expectedPatchChecksum) {
 const patchArchivePath = path.join('/tmp', 'profilepilot-feature-patch.tgz');
 fs.writeFileSync(patchArchivePath, patchArchive);
 execFileSync('tar', ['-xzf', patchArchivePath, '-C', root], { stdio: 'inherit' });
-console.log('ProfilePilot: applied verified AI, regional pricing, appeal and consultation feature patch.');
+
+// Apply the latest AI quality, prompt-voice, image-quality, regional-pricing and support upgrade.
+const upgradePath = path.join(root, 'bootstrap', 'upgrade-v2.b64');
+if (!fs.existsSync(upgradePath)) {
+  throw new Error('Missing ProfilePilot upgrade package: bootstrap/upgrade-v2.b64');
+}
+const upgradeArchive = Buffer.from(fs.readFileSync(upgradePath, 'utf8').trim(), 'base64');
+const upgradeChecksum = crypto.createHash('sha256').update(upgradeArchive).digest('hex');
+const expectedUpgradeChecksum = '33d8a8e4a92f0470b8d835a999a5f1b7fe2ec5f2a0e14e974c2cc4ed6e048c5e';
+if (upgradeChecksum !== expectedUpgradeChecksum) {
+  throw new Error(
+    `ProfilePilot upgrade checksum mismatch: expected ${expectedUpgradeChecksum}, received ${upgradeChecksum}`
+  );
+}
+const upgradeArchivePath = path.join('/tmp', 'profilepilot-upgrade-v2.tgz');
+fs.writeFileSync(upgradeArchivePath, upgradeArchive);
+execFileSync('tar', ['-xzf', upgradeArchivePath, '-C', root], { stdio: 'inherit' });
+console.log('ProfilePilot: applied latest AI, regional pricing, profile appeal and consultation upgrade.');
 
 // Keep the public site usable before production Supabase credentials are added.
 // Explicit Vercel environment variables always take precedence over this file.
